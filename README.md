@@ -1,10 +1,10 @@
 # CS-5363-001-Spring-2023-Programming Lang & Compilers
-# Project Phase II: Parser
+# Project Phase III: Semantic Analizer and Code Generation
 # By Eulises Franco
 
 Python Parser for DECAF22
 
-Project Phase II consists in building a Parser for the "Decaf 22" programming language
+Project Phase III consists in building a Parser for the "Decaf 22" programming language
 
 In order to run this program go inside workdir directory.
 Make sure exec.sh has executable permissions.
