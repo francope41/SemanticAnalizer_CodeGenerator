@@ -1,8 +1,13 @@
 from utils import *
 
 class MIPSCodeGenerator:
-    def __init__(self):
+    def __init__(self, semantic_analyzer):
         self.code = []
+        self.generated_code = []
+
+        self.semantic_analyzer = semantic_analyzer
+        self.symbol_table = semantic_analyzer.get_symbol_table()
+        self.label_count = 0
 
     def generate(self, ast_root):
         self.write_data_segment()
@@ -29,7 +34,7 @@ class MIPSCodeGenerator:
             self.visit(declaration)
 
     def visit_FunctionDecl(self, node):
-        self.code.append(f"{node.identifier}:")
+        self.code.append(f"{node.ident}:")
         for formal in node.formals:
             self.visit(formal)
         self.visit(node.stmt_block)
@@ -37,10 +42,16 @@ class MIPSCodeGenerator:
     def visit_VariableDecl(self, node):
         self.visit(node.variable)
 
-    def visit_Variable(self, node):
-        pass  # Handle variable code generation
+    def visit_Variable(self, variable):
+        variable_name = variable.ident
+        variable_info = self.semantic_analyzer.find_symbol(variable_name)
 
-    # Implement other visit methods for each node type here
+        print(variable_info)
+
+        #memory_offset = variable_info['offset']
+        memory_offset = variable_info.type_
+        load_instr = f"lw $t0, {memory_offset}($fp)"  # Assuming variables are stored in the stack frame
+        self.generated_code.append(load_instr)
 
     def visit_StmtBlock(self, node):
         for var_decl in node.variable_decls:
@@ -54,8 +65,6 @@ class MIPSCodeGenerator:
     def visit_PrintStmt(self, node):
         for expr in node.exprs:
             self.visit(expr)
-            # Assuming the expression result is stored in $a0
-
             if expr.type == Type('int'):
                 self.code.append("li $v0, 1")  # syscall for printing integer
             elif expr.type == Type('double'):
@@ -74,31 +83,33 @@ class MIPSCodeGenerator:
             self.visit(node.expr)
         self.code.append("jr $ra")
 
-    def visit_LValue(self, node):
-        # Assuming the variable's address is stored in the symbol table,
-        # and it can be accessed using the variable's identifier
-        address = self.symbol_table[node.identifier]
+    def visit_LValue(self, lvalue):
+        # Assuming lvalue.ident is the name of the variable
+        variable_name = lvalue.ident
 
-        if address is None:
-            raise ValueError(f"Undeclared variable: {node.identifier}")
+        # Retrieve the variable's information from the symbol table
+        variable_info = self.semantic_analyzer.find_symbol(variable_name)
 
-        # Load the variable value into $a0
-        self.code.append(f"lw $a0, {address}($gp)")
+        # Assuming variable_info contains the memory offset of the variable
+        memory_offset = variable_info.type_
+
+        # Generate MIPS code to load the value of the variable into a register
+        # Here, we use $t0 as the destination register, you may need to manage
+        # register allocation depending on your specific requirements
+        load_instr = f"lw $t0, {memory_offset}($fp)"  # Assuming variables are stored in the stack frame
+        self.generated_code.append(load_instr)
 
     def visit_Call(self, node):
-        # Save registers before the function call
         self.code.append("addi $sp, $sp, -4")
         self.code.append("sw $ra, 0($sp)")
 
-        # Push actuals onto the stack
         for actual in node.actuals:
             self.visit(actual)
-            # Assuming the actual's value is stored in $a0
             self.code.append("addi $sp, $sp, -4")
             self.code.append("sw $a0, 0($sp)")
 
         # Call the function
-        self.code.append(f"jal {node.identifier}")
+        self.code.append(f"jal {node.ident}")
 
         # Restore registers after the function call
         self.code.append("lw $ra, 0($sp)")
@@ -118,11 +129,79 @@ class MIPSCodeGenerator:
         else:
             raise Exception("Unsupported constant type")
 
+    # def visit_BinaryExpr(self, node):
+    #     left_type = self.visit(node.left)
+    #     right_type = self.visit(node.right)
+
+    #     if node.operator == "PLUS":
+    #         self.code.append("add $a0, $t0, $t1")
+    #     elif node.operator == "MINUS":
+    #         self.code.append("sub $a0, $t0, $t1")
+    #     elif node.operator == "MUL":
+    #         self.code.append("mul $a0, $t0, $t1")
+    #     elif node.operator == "DIV":
+    #         self.code.append("div $t0, $t1")
+    #         self.code.append("mflo $a0")
+    #     elif node.operator == "EQUALS":
+    #         self.code.append("seq $a0, $t0, $t1")
+    #     elif node.operator == "NOT_EQUALS":
+    #         self.code.append("sne $a0, $t0, $t1")
+    #     elif node.operator == "LESS_THAN":
+    #         self.code.append("slt $a0, $t0, $t1")
+    #     elif node.operator == "LESS_THAN_EQ":
+    #         self.code.append("sle $a0, $t0, $t1")
+    #     elif node.operator == "GREATER_THAN":
+    #         self.code.append("sgt $a0, $t0, $t1")
+    #     elif node.operator == "GREATER_THAN_EQ":
+    #         self.code.append("sge $a0, $t0, $t1")
+    #     else:
+    #         raise NotImplementedError(f"Unsupported binary operator: {node.operator}")
+
     def visit_BinaryExpr(self, node):
-        self.visit(node.left)
-        self.visit(node.right)
-        # Perform the operation based on the operator
-        pass  # Implement the specific operation for the binary expression here
+        if node.operator == "PLUS":
+            self.visit(node.left)
+            self.code.append("sw $a0, 0($sp)")  # Save the result of the left expression on the stack
+            self.visit(node.right)
+            self.code.append("lw $t0, 0($sp)")  # Load the result of the left expression from the stack
+            self.code.append("add $a0, $t0, $a0")  # Perform the addition
+            self.code.append("addi $sp, $sp, 4")  # Pop the left expression result from the stack
+        elif node.operator == "MINUS":
+            self.visit(node.left)
+            self.code.append("sw $a0, 0($sp)")  # Save the result of the left expression on the stack
+            self.visit(node.right)
+            self.code.append("lw $t0, 0($sp)")  # Load the result of the left expression from the stack
+            self.code.append("sub $a0, $t0, $a0")  # Perform the subtraction
+            self.code.append("addi $sp, $sp, 4")  # Pop the left expression result from the stack
+        elif node.operator == "TIMES":
+            self.visit(node.left)
+            self.code.append("sw $a0, 0($sp)")  # Save the result of the left expression on the stack
+            self.visit(node.right)
+            self.code.append("lw $t0, 0($sp)")  # Load the result of the left expression from the stack
+            self.code.append("mult $t0, $a0")  # Perform the multiplication
+            self.code.append("mflo $a0")  # Move the result to $a0
+            self.code.append("addi $sp, $sp, 4")  # Pop the left expression result from the stack
+        elif node.operator == "DIVIDE":
+            self.visit(node.left)
+            self.code.append("sw $a0, 0($sp)")  # Save the result of the left expression on the stack
+            self.visit(node.right)
+            self.code.append("lw $t0, 0($sp)")  # Load the result of the left expression from the stack
+            self.code.append("div $t0, $a0")  # Perform the division
+            self.code.append("mflo $a0")  # Move the quotient to $a0
+            self.code.append("addi $sp, $sp, 4")  # Pop the left expression result from the stack
+        elif node.operator == "EQUAL":
+            self.visit(node.right)
+            self.code.append("sw $a0, 0($sp)")
+            self.visit(node.left)
+            variable_name = node.left.ident
+            variable_info = self.symbol_table[variable_name]
+            memory_offset = variable_info.type_
+            self.code.append(f"lw $t0, 0($sp)")
+            self.code.append(f"sw $t0, {memory_offset}($fp)")
+            self.code.append("addi $sp, $sp, 4")  # Pop the right expression result from the stack
+        else:
+            raise NotImplementedError(f"Unsupported binary operator: {node.operator}")
+        
+
 
     def visit_UnaryExpr(self, node):
         self.visit(node.operand)
@@ -188,7 +267,9 @@ class MIPSCodeGenerator:
         # Assuming a corresponding end_label was defined in the enclosing loop
         self.code.append(f"j end_label")
 
+    def create_label(self):
+        label = f"label{self.label_count}"
+        self.label_count += 1
+        return label
    
-
-    # Continue implementing other visit methods for the remaining node types
 

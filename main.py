@@ -22,14 +22,28 @@ class SintaxAnalyzer:
         parser = Parser(tokens)
         ast = parser.parse_program()
 
-        semantic_analyzer = SemanticAnalyzer(ast)
-        semantic_analyzer.analyze()
+        # semantic_analyzer = SemanticAnalyzer()
+        # semantic_analyzer.analyze(ast)
 
-        mips_generator = MIPSCodeGenerator()
-        mips_generator.generate(ast)
 
-        generated_code = '\n'.join(mips_generator.code)
-        print(generated_code)
+        # mips_generator = MIPSCodeGenerator(semantic_analyzer)
+        # mips_generator.generate(ast)
+
+        # generated_code = '\n'.join(mips_generator.code)
+        # print(generated_code)
+
+        ast_root = Program([FunctionDecl(Type('void'), 'main', [], StmtBlock([VariableDecl(Variable(Type('int'), 'c')), VariableDecl(Variable(Type('string'), 's'))], [ExprStmt(BinaryExpr('EQUAL', LValue('s'), Constant('hello'))), ExprStmt(BinaryExpr('EQUAL', LValue('c'), Call('test', [Constant(4), Constant(5)]))), PrintStmt([LValue('c')]), PrintStmt([LValue('s')])])), FunctionDecl(Type('int'), 'test', [Variable(Type('int'), 'a'), Variable(Type('int'), 'b')], StmtBlock([], [ReturnStmt(BinaryExpr('PLUS', LValue('a'), LValue('b')))]))])
+
+        analyzer = SemanticAnalyzer()
+        analyzer.analyze(ast_root)
+
+        code_generator = MIPSCodeGenerator(analyzer)
+        code_generator.generate(ast_root)
+
+        generated_code = code_generator.generated_code
+
+        for line in generated_code:
+            print(line)
 
 
 

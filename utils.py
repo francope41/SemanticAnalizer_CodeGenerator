@@ -139,7 +139,7 @@ class Parser:
             else:
                 raise Exception("Invalid token")
 
-        return declarations
+        return Program(declarations)
 
     def parse_decl(self):
         if self.tokens[self.index]['type'] in ["INT", "DOUBLE", "BOOL", "STRING", "VOID"]:
@@ -448,7 +448,7 @@ class Program:
         self.declarations = declarations
 
     def __repr__(self):
-        return "{}".format(self.declarations)
+        return "Program({})".format(self.declarations)
 
 
 class Decl:
