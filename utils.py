@@ -364,7 +364,7 @@ class Parser:
     def parse_multiplicative_expr(self):
         left = self.parse_unary_expr()
 
-        while self.tokens[self.index]['type'] in ['STAR', 'SLASH', 'PERCENT']:
+        while self.tokens[self.index]['type'] in ['MULTIPLY', 'DIVIDE', 'MODULUS']:
             operator = self.tokens[self.index]['type']
             self.eat(operator)
             right = self.parse_unary_expr()

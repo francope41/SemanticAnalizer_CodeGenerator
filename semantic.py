@@ -1,3 +1,5 @@
+from utils import *
+
 
 class SemanticAnalyzer:
     def __init__(self):
@@ -7,14 +9,14 @@ class SemanticAnalyzer:
     def analyze(self, ast_root):
         for node in ast_root.declarations:
             self.visit(node)
-            
+
     def visit(self, node):
-        method_name = f"visit_{node.__class__.__name__}"
+        method_name = "visit_{}".format(node.__class__.__name__)
         visitor = getattr(self, method_name, self.generic_visit)
         return visitor(node)
 
     def generic_visit(self, node):
-        raise Exception(f"No visit_{node.__class__.__name__} method")
+        raise Exception("No visit_{} method".format(node.__class__.__name__))
 
     def visit_Program(self, node):
         for declaration in node.declarations:
@@ -23,16 +25,28 @@ class SemanticAnalyzer:
     def visit_VariableDecl(self, node):
         variable = node.variable
         if variable.ident in self.symbol_table:
-            self.errors.append(f"Variable {variable.ident} is already declared")
+            self.errors.append(
+                "Variable {} is already declared".format(variable.ident))
         else:
             self.symbol_table[variable.ident] = variable.type_
 
     def visit_FunctionDecl(self, node):
         if node.ident in self.symbol_table:
-            self.errors.append(f"Function {node.ident} is already declared")
+            self.errors.append("Function {} is already declared".format(node.ident))
         else:
             self.symbol_table[node.ident] = node.type_
+
+            for formal in node.formals:
+                self.visit(formal)
+                #self.symbol_table.add_symbol(formal.variable.ident, formal.variable)
+
             self.visit(node.stmt_block)
+
+    def visit_Variable(self, node):
+        if node.ident in self.symbol_table:
+            self.errors.append("Function {} is already declared".format(node.ident))
+        else:
+            self.symbol_table[node.ident] = node.type_
 
     def visit_StmtBlock(self, node):
         for var_decl in node.variable_decls:
@@ -42,6 +56,74 @@ class SemanticAnalyzer:
 
     def visit_ExprStmt(self, node):
         self.visit(node.expr)
+
+    def get_expr_type(self, expr):
+        if isinstance(expr, Constant):
+            return expr.value
+        elif isinstance(expr, LValue):
+            symbol = self.find_symbol(expr.ident)
+            if symbol is None:
+                raise Exception("Undeclared variable: {}".format(expr.ident))
+            return symbol.type_
+        elif isinstance(expr, BinaryExpr):
+            left_type = self.get_expr_type(expr.left)
+            right_type = self.get_expr_type(expr.right)            
+            operator = expr.operator
+            # Check for type mismatches
+            if type(left_type) !=  type(right_type):
+                raise Exception("*** Incompatible operands: {} - {}".format(left_type,right_type))
+            # Determine the result type based on the operator and operand types
+            if operator in {'PLUS', 'MINUS', 'TIMES', 'DIVIDE','MODULUS'}:
+                if isinstance(left_type,int):
+                    return Type('int')
+                elif isinstance(left_type,float):
+                    return Type('double')
+                else:
+                    raise NotImplementedError(
+                        "Unsupported type for binary operator: {}".format(operator))
+                
+            elif operator in {'EQUAL', 'NOT_EQUALS', 'LESS_THAN', 'LESS_THAN_EQ', 'GREATER_THAN', 'GREATER_THAN_EQ'}:
+                return Type('bool')
+            else:
+                raise NotImplementedError(
+                    "Unsupported binary operator: {}".format(operator))
+        elif isinstance(expr, UnaryExpr):
+            operand_type = self.get_expr_type(expr.operand)
+            operator = expr.operator
+            if operator == 'MINUS':
+                if operand_type == Type('int'):
+                    return Type('int')
+                elif operand_type == Type('double'):
+                    return Type('double')
+                else:
+                    raise NotImplementedError(
+                        "Unsupported type for unary operator: {}".format(operator))
+            elif operator == 'NOT':
+                if operand_type == Type('bool'):
+                    return Type('bool')
+                else:
+                    raise NotImplementedError(
+                        "Unsupported type for unary operator: {}".format(operator))
+            else:
+                raise NotImplementedError("Unsupported unary operator: {}".format(operator))
+        elif isinstance(expr, Call):
+            function_name = expr.ident
+            function_info = self.find_symbol(function_name)
+            if function_info is None:
+                raise Exception("Undeclared function: {}".format(function_name))
+            if len(expr.actuals) != len(function_info['formals']):
+                raise Exception(
+                    "Function {} called with incorrect number of arguments".format(function_name))
+            for actual, formal in zip(expr.actuals, function_info['formals']):
+                actual_type = self.get_expr_type(actual)
+                formal_type = formal['type']
+                if actual_type != formal_type:
+                    raise Exception(
+                        "Type mismatch in function call: {} passed for {}".format(actual_type,formal_type))
+            return function_info['return_type']
+        else:
+            raise NotImplementedError(
+                "Unsupported expression type: {}".format(type(expr).__name__))
 
     def visit_IfStmt(self, node):
         self.visit(node.expr)
@@ -72,17 +154,21 @@ class SemanticAnalyzer:
 
     def visit_LValue(self, node):
         if node.ident not in self.symbol_table:
-            self.errors.append(f"Variable {node.ident} is not declared")
+            self.errors.append("Variable {} is not declared".format(node.ident))
 
     def visit_Call(self, node):
         if node.ident not in self.symbol_table:
-            self.errors.append(f"Function {node.ident} is not declared")
+            self.errors.append("Function {} is not declared".format(node.ident))
         for actual in node.actuals:
             self.visit(actual)
 
     def visit_BinaryExpr(self, node):
         self.visit(node.left)
         self.visit(node.right)
+        left_type = self.get_expr_type(node.left)
+        right_type = self.get_expr_type(node.right)
+        if left_type != right_type:
+            self.errors.append("Incompatible operands: {} {} {}".format(left_type,node.operator,right_type))
 
     def visit_UnaryExpr(self, node):
         self.visit(node.operand)
@@ -108,5 +194,5 @@ class SemanticAnalyzer:
     def find_symbol(self, symbol_name):
         symbol = self.symbol_table.get(symbol_name)
         if symbol is None:
-            raise Exception(f"Symbol {symbol_name} not found")
+            raise Exception("Symbol {} not found".format(symbol_name))
         return symbol

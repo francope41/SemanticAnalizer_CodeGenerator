@@ -45,9 +45,6 @@ class MIPSCodeGenerator:
     def visit_Variable(self, variable):
         variable_name = variable.ident
         variable_info = self.semantic_analyzer.find_symbol(variable_name)
-
-        print(variable_info)
-
         #memory_offset = variable_info['offset']
         memory_offset = variable_info.type_
         load_instr = f"lw $t0, {memory_offset}($fp)"  # Assuming variables are stored in the stack frame
@@ -61,22 +58,43 @@ class MIPSCodeGenerator:
 
     def visit_ExprStmt(self, node):
         self.visit(node.expr)
+        # If the result of the expression is not used, pop it from the stack
+        if not isinstance(node.expr, LValue):
+            self.code.append("addi $sp, $sp, 4")
 
     def visit_PrintStmt(self, node):
         for expr in node.exprs:
+            if isinstance(expr, LValue):
+                variable_name = expr.ident
+                variable_info = self.semantic_analyzer.find_symbol(variable_name)
+                expr_type = variable_info.type_
+            else:
+                expr_type = self.semantic_analyzer.get_expr_type(expr)
+
             self.visit(expr)
-            if expr.type == Type('int'):
+
+            if expr_type == Type('int'):
                 self.code.append("li $v0, 1")  # syscall for printing integer
-            elif expr.type == Type('double'):
+            elif expr_type == Type('double'):
                 self.code.append("li $v0, 3")  # syscall for printing double
-            elif expr.type == Type('bool'):
+            elif expr_type == Type('bool'):
                 self.code.append("li $v0, 4")  # syscall for printing bool
-            elif expr.type == Type('string'):
+            elif expr_type == Type('string'):
+                self.code.append("li $v0, 4")  # syscall for printing string
+            
+            if expr_type == 'int':
+                self.code.append("li $v0, 1")  # syscall for printing integer
+            elif expr_type == 'double':
+                self.code.append("li $v0, 3")  # syscall for printing double
+            elif expr_type == 'bool':
+                self.code.append("li $v0, 4")  # syscall for printing bool
+            elif expr_type == 'string':
                 self.code.append("li $v0, 4")  # syscall for printing string
             else:
-                raise NotImplementedError(f"Unsupported type for printing: {expr.type}")
+                raise NotImplementedError(f"Unsupported type for printing: {expr_type}")
 
             self.code.append("syscall")  # Perform the syscall
+
 
     def visit_ReturnStmt(self, node):
         if node.expr is not None:
