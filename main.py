@@ -21,6 +21,7 @@ class SintaxAnalyzer:
         #Parse Program
         parser = Parser(tokens)
         ast = parser.parse_program()
+        
 
         semantic_analyzer = SemanticAnalyzer()
         semantic_analyzer.analyze(ast)
