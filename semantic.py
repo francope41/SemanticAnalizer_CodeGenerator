@@ -59,30 +59,74 @@ class SemanticAnalyzer:
 
     def get_expr_type(self, expr):
         if isinstance(expr, Constant):
-            return expr.value
+            if isinstance(expr.value,int):
+                return Type('int')
+            elif isinstance(expr.value,float):
+                return Type('double')
+            elif isinstance(expr.value,bool):
+                return Type('bool')
+            else:
+                raise NotImplementedError("Unsupported constant type {}".format(type(expr.value).__name__))
+
         elif isinstance(expr, LValue):
             symbol = self.find_symbol(expr.ident)
             if symbol is None:
-                raise Exception("Undeclared variable: {}".format(expr.ident))
-            return symbol.type_
+                raise Exception("Undeclared variable: {}".format(expr.ident))            
+            return Type(symbol.type_)
         elif isinstance(expr, BinaryExpr):
             left_type = self.get_expr_type(expr.left)
             right_type = self.get_expr_type(expr.right)            
             operator = expr.operator
-            # Check for type mismatches
-            if type(left_type) !=  type(right_type):
-                raise Exception("*** Incompatible operands: {} - {}".format(left_type,right_type))
+            # # Check for type mismatches
+            # if left_type.type_ !=  right_type.type_:
+            #     self.errors.append("*** Incompatible operands: {} - {}".format(left_type.type_, right_type.type_))
+            #     return None
             # Determine the result type based on the operator and operand types
-            if operator in {'PLUS', 'MINUS', 'TIMES', 'DIVIDE','MODULUS'}:
-                if isinstance(left_type,int):
-                    return Type('int')
-                elif isinstance(left_type,float):
+            if operator in {'PLUS', 'MINUS', 'MULTIPLY', 'DIVIDE','MODULUS'}:
+                if operator == 'PLUS':
+                    oper_sign = '+'
+                elif operator == 'MINUS':
+                    oper_sign = '-'
+                elif operator == 'MULTIPLY':
+                    oper_sign = '*'
+                elif operator == 'DIVIDE':
+                    oper_sign = '/'
+                elif operator == 'MODULUS':
+                    oper_sign = '%'
+
+                if (left_type.type_ == 'int' and right_type.type_ == 'int'):
+                    if isinstance(left_type,Type) and left_type.type_ == 'int':
+                        return Type('int')
+                elif (left_type.type_ == 'double' and right_type.type_ == 'double'):
+                    if isinstance(left_type,Type) and left_type.type_ == 'double':
+                        return Type('double')
+                    
+                elif left_type.type_ =='int' and right_type.type_ == 'double' or left_type.type_ =='double' and right_type.type_ == 'int':
+                    self.errors.append("*** Incompatible operands: {} {} {}".format(left_type.type_, oper_sign,right_type.type_))
                     return Type('double')
+                    
                 else:
                     raise NotImplementedError(
                         "Unsupported type for binary operator: {}".format(operator))
                 
-            elif operator in {'EQUAL', 'NOT_EQUALS', 'LESS_THAN', 'LESS_THAN_EQ', 'GREATER_THAN', 'GREATER_THAN_EQ'}:
+            elif operator in {'AND','OR','NOT'}:
+                if operator == 'AND':
+                    oper_sign = '&&'
+                elif operator == 'OR':
+                    oper_sign = '||'
+                elif operator == 'NOT':
+                    oper_sign = '!'
+
+                if (left_type.type_ == 'bool' and right_type.type_ == 'bool'):
+                    if isinstance(left_type,Type) and left_type.type_ == 'bool':
+                        return Type('bool')
+
+                elif left_type.type_ == 'bool' and right_type.type_ != 'bool' or left_type.type_ != 'bool' and right_type.type_ == 'bool':
+                    self.errors.append("*** Incompatible operands: {} {} {}".format(left_type.type_, oper_sign,right_type.type_))
+
+                
+            elif operator in {'EQUAL', 'NOT_EQUAL', 'LESS_THAN', 'LESS_THAN_EQUAL', 'GREATER_THAN', 'GREATER_THAN_EQUAL'}:
+                #YOU ARE HERE YOU NEED TO ADD ERRORS HERE 
                 return Type('bool')
             else:
                 raise NotImplementedError(
@@ -167,8 +211,9 @@ class SemanticAnalyzer:
         self.visit(node.right)
         left_type = self.get_expr_type(node.left)
         right_type = self.get_expr_type(node.right)
-        if left_type != right_type:
-            self.errors.append("Incompatible operands: {} {} {}".format(left_type,node.operator,right_type))
+        # print(left_type,right_type)
+        # if left_type != right_type:
+        #     self.errors.append("Incompatible operands: {} {} {}".format(left_type,node.operator,right_type))
 
     def visit_UnaryExpr(self, node):
         self.visit(node.operand)

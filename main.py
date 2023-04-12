@@ -25,6 +25,13 @@ class SintaxAnalyzer:
         semantic_analyzer = SemanticAnalyzer()
         semantic_analyzer.analyze(ast)
 
+        if semantic_analyzer.has_errors():
+            errors = semantic_analyzer.get_errors()
+            for error in errors:
+                print(error)
+        else:
+            print("No errors Found")
+
 
         # mips_generator = MIPSCodeGenerator(semantic_analyzer)
         # mips_generator.generate(ast)

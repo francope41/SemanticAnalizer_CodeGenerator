@@ -40,7 +40,7 @@ class Lex_Analyzer:
         t_READINTEGER = r'ReadInteger'
         t_READLINE = r'ReadLine'
         t_IDENTIFIER = r'[a-zA-Z_][a-zA-Z0-9_]*'
-        t_BOOL_CONST = r'true | false'
+        t_BOOL_CONST = r'\b(?:true|false)\b'
         # t_FALSE = r'false'
         t_INT_CONST = r'[0-9]+'
         t_DOUBLE_CONST = r'[0-9]+\.[0-9]*'
@@ -98,7 +98,7 @@ class Lex_Analyzer:
                     # self.tokens_list.append([token.value,'T_BoolConstant',line_count,token.lexpos])
                     # self.tokens_list.append(token.type)
                     self.tokens_list.append(
-                        {'type': token.type, 'value': token.value})
+                        {'type': 'BOOL_CONST', 'value': token.value})
 
                 else:
                     # self.tokens_list.append([token.value,token.type,line_count,token.lexpos])
@@ -294,10 +294,8 @@ class Parser:
         self.eat('SEMICOLON')
         return ExprStmt(expr)
 
-    # Implement parse_expr, parse_lvalue, parse_call, and other functions here
     def parse_expr(self):
         left = self.parse_logical_or_expr()
-
         while self.tokens[self.index]['type'] in ['EQUAL']:
             operator = self.tokens[self.index]['type']
             self.eat(operator)
@@ -342,7 +340,7 @@ class Parser:
     def parse_relational_expr(self):
         left = self.parse_additive_expr()
 
-        while self.tokens[self.index]['type'] in ['LESS', 'LESS_EQUAL', 'GREATER', 'GREATER_EQUAL']:
+        while self.tokens[self.index]['type'] in ['LESS_THAN', 'LESS_THAN_EQUAL', 'GREATER_THAN', 'GREATER_THAN_EQUAL']:
             operator = self.tokens[self.index]['type']
             self.eat(operator)
             right = self.parse_additive_expr()
