@@ -83,11 +83,7 @@ class SemanticAnalyzer:
                 return None
             
             operator = expr.operator
-            # # Check for type mismatches
-            # if left_type.type_ !=  right_type.type_:
-            #     self.errors.append("*** Incompatible operands: {} - {}".format(left_type.type_, right_type.type_))
-            #     return None
-            # Determine the result type based on the operator and operand types
+           
             if operator in {'PLUS', 'MINUS', 'MULTIPLY', 'DIVIDE','MODULUS'}:
                 if operator == 'PLUS':
                     oper_sign = '+'
@@ -230,7 +226,7 @@ class SemanticAnalyzer:
         self.visit(node.right)
         left_type = self.get_expr_type(node.left)
         right_type = self.get_expr_type(node.right)
-        
+
         if node.operator in {'PLUS', 'MINUS', 'MULTIPLY', 'DIVIDE','MODULUS'}:
             if node.operator == 'PLUS':
                 oper_sign = '+'
@@ -243,13 +239,10 @@ class SemanticAnalyzer:
             elif node.operator == 'MODULUS':
                 oper_sign = '%'
 
-            if left_type.type_ in {'int', 'double'} and right_type.type_ in {'int', 'double'}:
-                return Type('double') if left_type.type_ == 'double' or right_type.type_ == 'double' else Type('int')
-            else:
-                pass
-                #self.errors.append("*** yIncompatible operands: {} {} {}".format(left_type.type_, oper_sign, right_type.type_))
+            if (left_type.type_ == 'int' and right_type.type_ == 'double') or (left_type.type_ == 'double' and right_type.type_ == 'int'):
+                self.errors.append("*** Incompatible operands: {} {} {}".format(left_type.type_, oper_sign, right_type.type_))
 
-        elif node.operator in {'AND','OR'}:
+        elif node.operator in {'AND','OR','NOT'}:
             if node.operator == 'AND':
                 oper_sign = '&&'
             elif node.operator == 'OR':
@@ -260,7 +253,7 @@ class SemanticAnalyzer:
             if left_type.type_ == 'bool' and right_type.type_ == 'bool':
                 return Type('bool')
             else:
-                #self.errors.append("*** zIncompatible operands: {} {} {}".format(left_type.type_, oper_sign, right_type.type_))
+                self.errors.append("*** Incompatible operands: {} {} {}".format(left_type.type_, oper_sign, right_type.type_))
                 return None
             
         elif node.operator in {'EQUAL', 'NOT_EQUAL', 'LESS_THAN', 'LESS_THAN_EQUAL', 'GREATER_THAN', 'GREATER_THAN_EQUAL'}:
@@ -277,11 +270,16 @@ class SemanticAnalyzer:
             elif node.operator == 'GREATER_THAN_EQUAL':
                 oper_sign = '>='
             
-            if left_type.type_ in {'int', 'double'} and right_type.type_ in {'int', 'double'}:
-                return Type('bool')
-            else:
-                self.errors.append("*** Incompatible operands: {} {} {}".format(left_type.type_, node.operator, right_type.type_))
-                return None
+
+            if (left_type.type_ in {'int','double','bool'} and right_type.type_ in {'int','double','bool'}):
+                if left_type.type_ != right_type.type_:
+                    # print(left_type)
+                    # print(node.operator)
+                    # print(right_type)
+                    self.errors.append("*** Incompatible asoperands: {} {} {}".format(left_type.type_, node.operator, right_type.type_))
+                    return None
+                else:
+                    return Type('bool')
         else:
             self.get_expr_type(node)
             # raise NotImplementedError(
