@@ -26,6 +26,7 @@ class SintaxAnalyzer:
         semantic_analyzer = SemanticAnalyzer()
         semantic_analyzer.analyze(ast)
 
+
         if semantic_analyzer.has_errors():
             errors = semantic_analyzer.get_errors()
             for error in errors:

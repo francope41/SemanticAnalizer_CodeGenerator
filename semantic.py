@@ -5,6 +5,8 @@ class SemanticAnalyzer:
     def __init__(self):
         self.symbol_table = {}
         self.errors = []
+        self.loop_depth = 0
+        self.current_function_name = None  # Add current function name attribute
 
     def analyze(self, ast_root):
         for node in ast_root.declarations:
@@ -34,13 +36,18 @@ class SemanticAnalyzer:
         if node.ident in self.symbol_table:
             self.errors.append("Function {} is already declared".format(node.ident))
         else:
-            self.symbol_table[node.ident] = node.type_
+            self.symbol_table[node.ident] = {
+                'type':node.type_,
+                'formals':node.formals
+            }
 
             for formal in node.formals:
                 self.visit(formal)
                 #self.symbol_table.add_symbol(formal.variable.ident, formal.variable)
 
+            self.current_function_name = node.ident  # Set current function name
             self.visit(node.stmt_block)
+            self.current_function_name = None  # Clear current function name after visiting
 
     def visit_Variable(self, node):
         if node.ident in self.symbol_table:
@@ -65,6 +72,9 @@ class SemanticAnalyzer:
                 return Type('double')
             elif isinstance(expr.value,bool):
                 return Type('bool')
+            
+            elif isinstance(expr.value,str):
+                return Type('string')
             else:
                 raise NotImplementedError("Unsupported constant type {}".format(type(expr.value).__name__))
 
@@ -73,8 +83,11 @@ class SemanticAnalyzer:
             if symbol is None:
                 self.errors.append("Undeclared variable: {}".format(expr.ident))    
                 return None
-            return Type(symbol.type_)
-        
+            
+            try:
+                return Type(symbol.type_)
+            except:
+                return Type(symbol["type"].type_)
         elif isinstance(expr, BinaryExpr):
 
             left_type = self.get_expr_type(expr.left)
@@ -99,7 +112,7 @@ class SemanticAnalyzer:
                 if left_type.type_ in {'int', 'double'} and right_type.type_ in {'int', 'double'}:
                     return Type('double') if left_type.type_ == 'double' or right_type.type_ == 'double' else Type('int')
                 else:
-                    self.errors.append("*** xIncompatible operands: {} {} {}".format(left_type.type_, oper_sign, right_type.type_))
+                    self.errors.append("*** Incompatible operands: {} {} {}".format(left_type.type_, oper_sign, right_type.type_))
 
             elif operator in {'AND','OR'}:
                 if operator == 'AND':
@@ -163,7 +176,7 @@ class SemanticAnalyzer:
             if function_info is None:
                 self.errors.append("Undeclared function: {}".format(function_name))
                 return None
-
+            
             if len(expr.actuals) != len(function_info['formals']):
                 self.errors.append("Function {} called with incorrect number of arguments".format(function_name))
                 return None
@@ -171,7 +184,7 @@ class SemanticAnalyzer:
             has_error = False
             for actual, formal in zip(expr.actuals, function_info['formals']):
                 actual_type = self.get_expr_type(actual)
-                formal_type = formal['type']
+                formal_type = formal.type_
                 if actual_type != formal_type:
                     self.errors.append(
                     "Type mismatch in function call: {} passed for {}".format(actual_type, formal_type))
@@ -179,7 +192,9 @@ class SemanticAnalyzer:
 
             if has_error:
                 return None
-            return function_info['return_type']
+            
+            return Type(function_info['return_type'])
+            #return function_info['return_type']
         else:
             raise NotImplementedError(
                 "Unsupported expression type: {}".format(type(expr).__name__))
@@ -191,21 +206,37 @@ class SemanticAnalyzer:
             self.visit(node.else_stmt)
 
     def visit_WhileStmt(self, node):
+        self.loop_depth += 1
         self.visit(node.expr)
         self.visit(node.stmt)
+        self.loop_depth -= 1
 
     def visit_ForStmt(self, node):
+        self.loop_depth += 1
         self.visit(node.init_expr)
         self.visit(node.cond_expr)
+        cond_expr_type = self.get_expr_type(node.cond_expr)
+        if cond_expr_type.type_ != 'bool':
+            self.errors.append("Test expression must have boolean type")
+        
         self.visit(node.update_expr)
         self.visit(node.stmt)
+        self.loop_depth -= 1
 
     def visit_BreakStmt(self, node):
-        pass
+        if self.loop_depth == 0:  # Check if we are not inside a loop
+            self.errors.append("break is only allowed inside a loop")
 
     def visit_ReturnStmt(self, node):
         if node.expr is not None:
-            self.visit(node.expr)
+            actual_return_type = self.get_expr_type(node.expr)
+            expected_return_type = self.symbol_table[self.current_function_name]['type']
+            if actual_return_type.type_ != expected_return_type.type_:
+                self.errors.append("Incompatible return: {} given, {} expected".format(actual_return_type.type_, expected_return_type.type_))
+        else:
+            expected_return_type = self.symbol_table[self.current_function_name]['type']
+            if expected_return_type.type_ != 'void':
+                self.errors.append("Incompatible return: void given, {} expected".format(expected_return_type.type_))
 
     def visit_PrintStmt(self, node):
         for expr in node.exprs:
@@ -218,6 +249,20 @@ class SemanticAnalyzer:
     def visit_Call(self, node):
         if node.ident not in self.symbol_table:
             self.errors.append("Function {} is not declared".format(node.ident))
+        
+        function_info = self.find_symbol(node.ident)
+
+        # Check the length of the arguments.
+        if len(node.actuals) != len(function_info['formals']):
+            self.errors.append("Function {} called with incorrect number of arguments".format(node.ident))
+        else:
+            # Compare the actual argument types with the expected argument types.
+            for idx, (actual, formal) in enumerate(zip(node.actuals, function_info['formals'])):
+                actual_type = self.get_expr_type(actual)
+                formal_type = formal.type_
+                if actual_type.type_ != formal_type.type_:
+                    self.errors.append("Incompatible argument {}: {} given, {} expected".format(idx + 1, actual_type.type_, formal_type.type_))
+
         for actual in node.actuals:
             self.visit(actual)
 
@@ -227,68 +272,83 @@ class SemanticAnalyzer:
         left_type = self.get_expr_type(node.left)
         right_type = self.get_expr_type(node.right)
 
-        if node.operator in {'PLUS', 'MINUS', 'MULTIPLY', 'DIVIDE','MODULUS'}:
-            if node.operator == 'PLUS':
-                oper_sign = '+'
-            elif node.operator == 'MINUS':
-                oper_sign = '-'
-            elif node.operator == 'MULTIPLY':
-                oper_sign = '*'
-            elif node.operator == 'DIVIDE':
-                oper_sign = '/'
-            elif node.operator == 'MODULUS':
-                oper_sign = '%'
+        # print(node.operator)
+        if left_type and right_type:
 
-            if (left_type.type_ == 'int' and right_type.type_ == 'double') or (left_type.type_ == 'double' and right_type.type_ == 'int'):
-                self.errors.append("*** Incompatible operands: {} {} {}".format(left_type.type_, oper_sign, right_type.type_))
+            if node.operator in {'PLUS', 'MINUS', 'MULTIPLY', 'DIVIDE','MODULUS'}:
+                if node.operator == 'PLUS':
+                    oper_sign = '+'
+                elif node.operator == 'MINUS':
+                    oper_sign = '-'
+                elif node.operator == 'MULTIPLY':
+                    oper_sign = '*'
+                elif node.operator == 'DIVIDE':
+                    oper_sign = '/'
+                elif node.operator == 'MODULUS':
+                    oper_sign = '%'
 
-        elif node.operator in {'AND','OR','NOT'}:
-            if node.operator == 'AND':
-                oper_sign = '&&'
-            elif node.operator == 'OR':
-                oper_sign = '||'
-            elif node.operator == 'NOT':
-                oper_sign = '!'
+                if (left_type.type_ == 'int' and right_type.type_ == 'double') or (left_type.type_ == 'double' and right_type.type_ == 'int'):
+                    self.errors.append("*** Incompatible operands: {} {} {}".format(left_type.type_, oper_sign, right_type.type_))
 
-            if left_type.type_ == 'bool' and right_type.type_ == 'bool':
-                return Type('bool')
-            else:
-                self.errors.append("*** Incompatible operands: {} {} {}".format(left_type.type_, oper_sign, right_type.type_))
-                return None
-            
-        elif node.operator in {'EQUAL', 'NOT_EQUAL', 'LESS_THAN', 'LESS_THAN_EQUAL', 'GREATER_THAN', 'GREATER_THAN_EQUAL'}:
-            if node.operator == 'EQUAL':
-                oper_sign = '='
-            elif node.operator == 'NOT_EQUAL':
-                oper_sign = '!='
-            elif node.operator == 'LESS_THAN':
-                oper_sign = '<'
-            elif node.operator == 'LESS_THAN_EQUAL':
-                oper_sign = '<='
-            elif node.operator == 'GREATER_THAN':
-                oper_sign = '>'
-            elif node.operator == 'GREATER_THAN_EQUAL':
-                oper_sign = '>='
-            
+            elif node.operator in {'AND','OR','NOT'}:
+                if node.operator == 'AND':
+                    oper_sign = '&&'
+                elif node.operator == 'OR':
+                    oper_sign = '||'
+                elif node.operator == 'NOT':
+                    oper_sign = '!'
 
-            if (left_type.type_ in {'int','double','bool'} and right_type.type_ in {'int','double','bool'}):
-                if left_type.type_ != right_type.type_:
-                    # print(left_type)
-                    # print(node.operator)
-                    # print(right_type)
-                    self.errors.append("*** Incompatible asoperands: {} {} {}".format(left_type.type_, node.operator, right_type.type_))
-                    return None
-                else:
+                if left_type.type_ == 'bool' and right_type.type_ == 'bool':
                     return Type('bool')
-        else:
-            self.get_expr_type(node)
-            # raise NotImplementedError(
-            #     "Unsupported binary node.operator: {}".format(node.operator))
+                    
+                else:
+                    self.errors.append("*** Incompatible operands: {} {} {}".format(left_type.type_, oper_sign, right_type.type_))
+                    return None
+                
+            elif node.operator in {'EQUAL', 'NOT_EQUAL', 'LESS_THAN', 'LESS_THAN_EQUAL', 'GREATER_THAN', 'GREATER_THAN_EQUAL'}:
+                if node.operator == 'EQUAL':
+                    oper_sign = '='
+                elif node.operator == 'NOT_EQUAL':
+                    oper_sign = '!='
+                elif node.operator == 'LESS_THAN':
+                    oper_sign = '<'
+                elif node.operator == 'LESS_THAN_EQUAL':
+                    oper_sign = '<='
+                elif node.operator == 'GREATER_THAN':
+                    oper_sign = '>'
+                elif node.operator == 'GREATER_THAN_EQUAL':
+                    oper_sign = '>='
+                
+                if left_type and right_type:
+                    if (left_type.type_ in {'int','double','bool'} and right_type.type_ in {'int','double','bool'}):
+                        if left_type.type_ != right_type.type_:
+                            # print(left_type)
+                            # print(node.operator)
+                            # print(right_type)
+                            self.errors.append("*** Incompatible operands: {} {} {}".format(left_type.type_, node.operator, right_type.type_))
+                            return None
+                        else:
+                            return Type('bool')
+            else:
+                self.get_expr_type(node)
+                # raise NotImplementedError(
+                #     "Unsupported binary node.operator: {}".format(node.operator))
         
 
     def visit_UnaryExpr(self, node):
         self.visit(node.operand)
+        operand_type = self.get_expr_type(node.operand)
+        operator = node.operator
 
+        if operator == 'MINUS':
+            if operand_type.type_ not in {'int', 'double'}:
+                self.errors.append("*** Incompatible operand: {} {}".format('-', operand_type.type_))
+        elif operator == 'NOT':
+            if operand_type.type_ != 'bool':
+                self.errors.append("*** Incompatible operand: {} {}".format("!", operand_type.type_))
+        else:
+            raise NotImplementedError("Unsupported unary operator: {}".format(operator))
+        
     def visit_Constant(self, node):
         pass
 
