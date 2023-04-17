@@ -10,6 +10,9 @@ class SemanticAnalyzer:
 
     def analyze(self, ast_root):
         for node in ast_root.declarations:
+            self.Functions_toSymbols(node)
+        
+        for node in ast_root.declarations:
             self.visit(node)
 
     def visit(self, node):
@@ -33,13 +36,13 @@ class SemanticAnalyzer:
             self.symbol_table[variable.ident] = variable.type_
 
     def visit_FunctionDecl(self, node):
-        if node.ident in self.symbol_table:
-            self.errors.append("Function {} is already declared".format(node.ident))
-        else:
-            self.symbol_table[node.ident] = {
-                'type':node.type_,
-                'formals':node.formals
-            }
+        # if node.ident in self.symbol_table:
+        #     self.errors.append("Function {} is already declared".format(node.ident))
+        # else:
+        #     self.symbol_table[node.ident] = {
+        #         'type':node.type_,
+        #         'formals':node.formals
+        #     }
 
             for formal in node.formals:
                 self.visit(formal)
@@ -185,15 +188,15 @@ class SemanticAnalyzer:
             for actual, formal in zip(expr.actuals, function_info['formals']):
                 actual_type = self.get_expr_type(actual)
                 formal_type = formal.type_
-                if actual_type != formal_type:
+                print(expr.actuals)
+                if actual_type.type_ != formal_type.type_:
                     self.errors.append(
                     "Type mismatch in function call: {} passed for {}".format(actual_type, formal_type))
                     has_error = True
 
             if has_error:
                 return None
-            
-            return Type(function_info['return_type'])
+            return Type(function_info['type'])
             #return function_info['return_type']
         else:
             raise NotImplementedError(
@@ -334,7 +337,6 @@ class SemanticAnalyzer:
                 # raise NotImplementedError(
                 #     "Unsupported binary node.operator: {}".format(node.operator))
         
-
     def visit_UnaryExpr(self, node):
         self.visit(node.operand)
         operand_type = self.get_expr_type(node.operand)
@@ -372,3 +374,21 @@ class SemanticAnalyzer:
         if symbol is None:
             raise Exception("Symbol {} not found".format(symbol_name))
         return symbol
+
+    def Functions_toSymbols(self, node):
+        if isinstance(node,VariableDecl):
+            variable = node.variable
+            if variable.ident in self.symbol_table:
+                self.errors.append(
+                    "Variable {} is already declared".format(variable.ident))
+            else:
+                self.symbol_table[variable.ident] = variable.type_
+
+        elif isinstance(node, FunctionDecl):
+            if node.ident in self.symbol_table:
+                self.errors.append("Function {} is already declared".format(node.ident))
+            else:
+                self.symbol_table[node.ident] = {
+                    'type':node.type_,
+                    'formals':node.formals
+                }
