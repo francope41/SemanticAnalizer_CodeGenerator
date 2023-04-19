@@ -54,10 +54,10 @@ class SemanticAnalyzer:
             self.current_function_name = None  # Clear current function name after visiting
 
     def visit_Variable(self, node):
-        if node.ident in self.symbol_table:
-            self.errors.append("Function {} is already declared".format(node.ident))
-        else:
-            self.symbol_table[node.ident] = node.type_
+        # if node.ident in self.symbol_table:
+        #     self.errors.append("Function {} is already declared".format(node.ident))
+        # else:
+        self.symbol_table[node.ident] = node.type_
 
     def visit_StmtBlock(self, node):
         for var_decl in node.variable_decls:
@@ -269,6 +269,9 @@ class SemanticAnalyzer:
             for idx, (actual, formal) in enumerate(zip(node.actuals, function_info['formals'])):
                 actual_type = self.get_expr_type(actual)
                 formal_type = formal.type_
+                if isinstance(actual_type.type_,Type):
+                    actual_type = actual_type.type_
+                    #actual_type = self.get_expr_type(actual_type.type_)
                 if actual_type.type_ != formal_type.type_:
                     self.errors.append("Incompatible argument {}: {} given, {} expected".format(idx + 1, actual_type.type_, formal_type.type_))
 
