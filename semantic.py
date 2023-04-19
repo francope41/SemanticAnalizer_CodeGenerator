@@ -29,11 +29,12 @@ class SemanticAnalyzer:
 
     def visit_VariableDecl(self, node):
         variable = node.variable
-        if variable.ident in self.symbol_table:
-            self.errors.append(
-                "Variable {} is already declared".format(variable.ident))
-        else:
-            self.symbol_table[variable.ident] = variable.type_
+        # if variable.ident in self.symbol_table:
+        #     print('as')
+
+        #     self.errors.append(
+        #         "Variable {} is already declared".format(variable.ident))
+        self.symbol_table[variable.ident] = variable.type_
 
     def visit_FunctionDecl(self, node):
         # if node.ident in self.symbol_table:
@@ -69,13 +70,12 @@ class SemanticAnalyzer:
 
     def get_expr_type(self, expr):
         if isinstance(expr, Constant):
-            if isinstance(expr.value,int):
+            if isinstance(expr.value,bool):
+                return Type('bool')
+            elif isinstance(expr.value,int):
                 return Type('int')
             elif isinstance(expr.value,float):
                 return Type('double')
-            elif isinstance(expr.value,bool):
-                return Type('bool')
-            
             elif isinstance(expr.value,str):
                 return Type('string')
             else:
@@ -99,6 +99,7 @@ class SemanticAnalyzer:
                 return None
             
             operator = expr.operator
+
            
             if operator in {'PLUS', 'MINUS', 'MULTIPLY', 'DIVIDE','MODULUS'}:
                 if operator == 'PLUS':
@@ -114,8 +115,10 @@ class SemanticAnalyzer:
 
                 if left_type.type_ in {'int', 'double'} and right_type.type_ in {'int', 'double'}:
                     return Type('double') if left_type.type_ == 'double' or right_type.type_ == 'double' else Type('int')
+                elif left_type.type_ in {'int','double'} and right_type.type_.type_ in {'int','double'}:
+                    return Type('double') if left_type.type_ == 'double' or right_type.type_ == 'double' else Type('int')
                 else:
-                    self.errors.append("*** Incompatible operands: {} {} {}".format(left_type.type_, oper_sign, right_type.type_))
+                    self.errors.append("*** zzIncompatible operands: {} {} {}".format(left_type.type_, oper_sign, right_type.type_))
 
             elif operator in {'AND','OR'}:
                 if operator == 'AND':
@@ -127,8 +130,10 @@ class SemanticAnalyzer:
 
                 if left_type.type_ == 'bool' and right_type.type_ == 'bool':
                     return Type('bool')
+                elif left_type.type_.type_ == 'bool' and right_type.type_.type_ == 'bool':
+                    return Type('bool')
                 else:
-                    self.errors.append("*** yIncompatible operands: {} {} {}".format(left_type.type_, oper_sign, right_type.type_))
+                    self.errors.append("*** Incompatible operands: {} {} {}".format(left_type.type_, oper_sign, right_type.type_))
                     return None
                 
             elif operator in {'EQUAL', 'NOT_EQUAL', 'LESS_THAN', 'LESS_THAN_EQUAL', 'GREATER_THAN', 'GREATER_THAN_EQUAL'}:
@@ -188,7 +193,6 @@ class SemanticAnalyzer:
             for actual, formal in zip(expr.actuals, function_info['formals']):
                 actual_type = self.get_expr_type(actual)
                 formal_type = formal.type_
-                print(expr.actuals)
                 if actual_type.type_ != formal_type.type_:
                     self.errors.append(
                     "Type mismatch in function call: {} passed for {}".format(actual_type, formal_type))
@@ -234,7 +238,9 @@ class SemanticAnalyzer:
         if node.expr is not None:
             actual_return_type = self.get_expr_type(node.expr)
             expected_return_type = self.symbol_table[self.current_function_name]['type']
-            if actual_return_type.type_ != expected_return_type.type_:
+            if actual_return_type is None:
+                pass
+            elif actual_return_type.type_ != expected_return_type.type_:
                 self.errors.append("Incompatible return: {} given, {} expected".format(actual_return_type.type_, expected_return_type.type_))
         else:
             expected_return_type = self.symbol_table[self.current_function_name]['type']

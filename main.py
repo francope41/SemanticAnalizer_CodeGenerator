@@ -20,23 +20,24 @@ class SintaxAnalyzer:
         tokens, linesList = Lexer.Tokenize()
         #Parse Program
         parser = Parser(tokens)
-        ast = parser.parse_program()        
+        ast = parser.parse_program()     
 
 
         semantic_analyzer = SemanticAnalyzer()
         semantic_analyzer.analyze(ast)
-
 
         if semantic_analyzer.has_errors():
             errors = semantic_analyzer.get_errors()
             for error in errors:
                 print(error)
         else:
-            print("No errors Found")
+            pass
+            #print("No errors Found")
 
+        mips_generator = MIPSCodeGenerator(ast)
+        code = mips_generator.generate_code()
 
-        # mips_generator = MIPSCodeGenerator(semantic_analyzer)
-        # mips_generator.generate(ast)
+        print(code)
 
         # generated_code = '\n'.join(mips_generator.code)
         # print(generated_code)
