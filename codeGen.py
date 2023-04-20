@@ -9,9 +9,11 @@ class MIPSCodeGenerator:
 
     def generate_code(self):
         main_found = False
+        self.code += "# standard Decaf preamble\n"
         self.code += "  .text\n"
         self.code += "  .align 2\n"
         self.code += "  .globl main\n"
+
         for decl in self.ast.declarations:
             if isinstance(decl, FunctionDecl):
                 if decl.ident == "main":
@@ -21,22 +23,28 @@ class MIPSCodeGenerator:
         if not main_found:
             print("*** Error.\n*** Linker: function 'main' not defined")
             quit()
-
-        self.generate_string_constants()
         
         return self.code
 
     def process_function_decl(self, function_decl):
-        self.code += f"{function_decl.ident}:\n"
-        self.code += "  subu $sp, $sp, 4  # allocate space for return address\n"
-        self.code += "  sw $ra, 0($sp)  # save return address\n"
+        self.code += "{}:\n".format(function_decl.ident)
+        self.code += "	# BeginFunc\n"
+        self.code += "      subu $sp, $sp, 8  # decrement sp to make space to save ra, fp\n"
+        self.code += "	  sw $fp, 8($sp)	# save fp\n"
+        self.code += "	  sw $ra, 4($sp)	# save ra\n"
+        self.code += "      addiu $fp, $sp, 8  # set up new fp\n"
+        self.code += "	  subu $sp, $sp, 24	# decrement sp to make space for locals/temps\n"
+        #self.code += "    sw $ra, 0($sp)  # save return address\n"
+
         for stmt in function_decl.stmt_block.stmts:
             if isinstance(stmt, ExprStmt):
                 self.process_expr(stmt.expr)
             elif isinstance(stmt, PrintStmt):
                 self.process_print_stmt(stmt)
-        self.code += "  lw $ra, 0($sp)  # restore return address\n"
-        self.code += "  addu $sp, $sp, 4  # deallocate space for return address\n"
+        #self.code += "  lw $ra, 0($sp)  # restore return address\n"
+        self.code += "      move $sp, $fp		# pop callee frame off stack\n"
+        self.code += "	  lw $ra, -4($fp)	# restore saved ra\n"
+        self.code += "	  lw $fp, 0($fp)	# restore saved fp\n"
         self.code += "  jr $ra  # return to caller\n"
 
     def process_expr(self, expr):
@@ -44,6 +52,8 @@ class MIPSCodeGenerator:
             self.process_binary_expr(expr)
         elif isinstance(expr, Call):
             self.process_call(expr)
+        elif isinstance(expr, Constant) and isinstance(expr.value, str):  # Handle string constants
+            self.process_string_constant(expr)
 
     def process_binary_expr(self, binary_expr):
         # Assuming left and right operands are either Constant or LValue
@@ -72,7 +82,6 @@ class MIPSCodeGenerator:
 
         self.code += f"  sw $t2, {binary_expr.left.ident}\n"
 
-
     def process_call(self, call):
         # Assuming this handles print integer and print string calls only
         if call.ident == "_PrintInt":
@@ -100,18 +109,25 @@ class MIPSCodeGenerator:
                     # self.code += " la $a0, newline\n"
                     # self.process_call(Call("_PrintString", []))
 
-
             self.code += "  subu $sp, $sp, 4  # decrement sp to make space for param\n"
             self.code += "  sw $t0, 4($sp)    # copy param value to stack\n"
             self.code += "  jal _PrintInt\n" if isinstance(expr, Constant) and isinstance(expr.value, int) else "  jal _PrintString\n"
             self.code += "  add $sp, $sp, 4  # pop params off stack\n"
 
-    def generate_string_constants(self):
-        #self.code += "  .data\n"
-        #self.code += 'newline: .asciiz "\\n"\n'
-        for i, string_constant in enumerate(self.string_constants, start=1):
-            self.code += f"  .data\n"
-            self.code += f"  _string{i}: .asciiz \"{string_constant}\"\n"
+    def process_string_constant(self, expr):
+        string_value = expr.value
+        if string_value not in self.string_constants:
+            label = f"_string{len(self.string_constants) + 1}"
+            self.string_constants[string_value] = label
+            self.code += "  .data\n"
+            self.code += f"  {label}: .asciiz \"{string_value}\"\n"
+            self.code += "  .text\n"
+        else:
+            label = self.string_constants[string_value]
+
+        tmp_name = self.new_tmp()
+        self.code += f"  la $t2, {label}\n"
+        self.code += f"  sw $t2, {tmp_name}($fp)\n"
 
 
     def new_tmp(self):

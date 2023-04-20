@@ -30,6 +30,7 @@ class SintaxAnalyzer:
             errors = semantic_analyzer.get_errors()
             for error in errors:
                 print(error)
+            quit()
         else:
             pass
             #print("No errors Found")
@@ -38,6 +39,20 @@ class SintaxAnalyzer:
         code = mips_generator.generate_code()
 
         self.save_code_to_file(code, "t1.s")
+
+        with open('t1.s', 'r') as f:
+            original_contents = f.read()
+
+        # Open the second file for reading
+        with open('../pp3-post/defs.asm', 'r') as f:
+            defs_contents = f.read()
+
+        # Concatenate the contents of the two files
+        new_contents = original_contents + '\n' + defs_contents
+
+        # Open the first file for writing and write the concatenated contents
+        with open('t1.s', 'w') as f:
+            f.write(new_contents)
 
     def save_code_to_file(self, code, file_name):
         with open(file_name, "w") as file:
