@@ -10,6 +10,8 @@ from utils import *
 from semantic import SemanticAnalyzer
 from codeGen import MIPSCodeGenerator
 
+from testcodegen import ASTToMIPS
+
 #### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -####
 
 
@@ -38,7 +40,11 @@ class SintaxAnalyzer:
         mips_generator = MIPSCodeGenerator(ast)
         code = mips_generator.generate_code()
 
-        self.save_code_to_file(code, "t1.s")
+        converter = ASTToMIPS()
+        mips_instructions = converter.generate_mips(ast)
+        print(mips_instructions)
+
+        self.save_code_to_file(mips_instructions, "t1.s")
 
         with open('t1.s', 'r') as f:
             original_contents = f.read()
