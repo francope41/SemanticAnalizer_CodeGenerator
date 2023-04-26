@@ -61,14 +61,14 @@ class MIPSCodeGenerator:
         right_operand = binary_expr.right
 
         if isinstance(left_operand, Constant):
-            self.code += f"  li $t0, {left_operand.value}\n"
+            self.code += "  li $t0, {}\n".format(left_operand.value)
         elif isinstance(left_operand, LValue):
-            self.code += f"  lw $t0, {left_operand.ident}\n"
+            self.code += "  lw $t0, {}\n".format(left_operand.ident)
 
         if isinstance(right_operand, Constant):
-            self.code += f"  li $t1, {right_operand.value}\n"
+            self.code += "  li $t1, {}\n".format(right_operand.value)
         elif isinstance(right_operand, LValue):
-            self.code += f"  lw $t1, {right_operand.ident}\n"
+            self.code += "  lw $t1, {}\n".format(right_operand.ident)
 
         if binary_expr.operator == "PLUS":
             self.code += "  add $t2, $t0, $t1\n"
@@ -80,7 +80,7 @@ class MIPSCodeGenerator:
             self.code += "  div $t2, $t0, $t1\n"
         # Add other binary operators as needed
 
-        self.code += f"  sw $t2, {binary_expr.left.ident}\n"
+        self.code += "  sw $t2, {}\n".format(binary_expr.left.ident)
 
     def process_call(self, call):
         # Assuming this handles print integer and print string calls only
@@ -94,17 +94,17 @@ class MIPSCodeGenerator:
     def process_print_stmt(self, print_stmt):
         for expr in print_stmt.exprs:
             if isinstance(expr, LValue):
-                self.code += f" lw $a0, {expr.ident}\n"
+                self.code += " lw $a0, {}\n".format(expr.ident)
                 # self.process_call(Call("_PrintInt" if isinstance(expr, Constant) else "_PrintString", []))
                 # self.code += " la $a0, newline\n"
                 # self.process_call(Call("_PrintString", []))
             elif isinstance(expr, Constant):
                 if isinstance(expr.value, int):
-                    self.code += f" li $a0, {expr.value}\n"
+                    self.code += " li $a0, {}\n".format(expr.value)
                     # self.process_call(Call("_PrintInt", []))
                 elif isinstance(expr.value, str):
                     index = self.string_constants.index(expr.value)
-                    self.code += f" la $a0, str{index}\n"
+                    self.code += " la $a0, str{}\n".format(index)
                     # self.process_call(Call("_PrintString", []))
                     # self.code += " la $a0, newline\n"
                     # self.process_call(Call("_PrintString", []))
@@ -117,20 +117,20 @@ class MIPSCodeGenerator:
     def process_string_constant(self, expr):
         string_value = expr.value
         if string_value not in self.string_constants:
-            label = f"_string{len(self.string_constants) + 1}"
+            label = "_string{}".format(len(self.string_constants) + 1)
             self.string_constants[string_value] = label
             self.code += "  .data\n"
-            self.code += f"  {label}: .asciiz \"{string_value}\"\n"
+            self.code += "  {}: .asciiz \"{}\"\n".format(label,string_value)
             self.code += "  .text\n"
         else:
             label = self.string_constants[string_value]
 
         tmp_name = self.new_tmp()
-        self.code += f"  la $t2, {label}\n"
-        self.code += f"  sw $t2, {tmp_name}($fp)\n"
+        self.code += "  la $t2, {}\n".format(label)
+        self.code += "  sw $t2, {}($fp)\n".format(tmp_name)
 
 
     def new_tmp(self):
-        tmp_name = f"_tmp{self.tmp_counter}"
+        tmp_name = "_tmp{}".format(self.tmp_counter)
         self.tmp_counter += 1
         return tmp_name
