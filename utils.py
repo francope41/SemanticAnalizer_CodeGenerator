@@ -121,7 +121,7 @@ class Parser:
             self.index += 1
         else:
             raise Exception(
-                f"Unexpected token: {self.tokens[self.index]['type']}")
+                "Unexpected token: {}".format(self.tokens[self.index]['type']))
 
     def peek(self):
         if self.index + 1 < len(self.tokens):
@@ -458,7 +458,7 @@ class VariableDecl(Decl):
         self.variable = variable
 
     def __repr__(self):
-        return f"VariableDecl({self.variable})"
+        return "VariableDecl({})".format(self.variable)
 
 
 class FunctionDecl(Decl):
@@ -469,7 +469,7 @@ class FunctionDecl(Decl):
         self.stmt_block = stmt_block
 
     def __repr__(self):
-        return f"FunctionDecl({self.type_}, {self.ident}, {self.formals}, {self.stmt_block})"
+        return "FunctionDecl({}, {}, {}, {})".format(self.type_,self.ident,self.formals,self.stmt_block)
 
 
 class Variable:
@@ -478,7 +478,7 @@ class Variable:
         self.ident = ident
 
     def __repr__(self):
-        return f"Variable({self.type_}, {self.ident})"
+        return "Variable({}, {})".format(self.type_,self.ident)
 
 
 class Type:
@@ -486,7 +486,7 @@ class Type:
         self.type_ = type_
 
     def __repr__(self):
-        return f"Type({self.type_})"
+        return "Type({})".format(self.type_)
 
 
 class StmtBlock:
@@ -495,7 +495,7 @@ class StmtBlock:
         self.stmts = stmts
 
     def __repr__(self):
-        return f"StmtBlock({self.variable_decls}, {self.stmts})"
+        return "StmtBlock({}, {})".format(self.variable_decls,self.stmts)
 
 
 class Stmt:
@@ -507,7 +507,7 @@ class ExprStmt(Stmt):
         self.expr = expr
 
     def __repr__(self):
-        return f"ExprStmt({self.expr})"
+        return "ExprStmt({})".format(self.expr)
 
 
 class IfStmt(Stmt):
@@ -517,7 +517,7 @@ class IfStmt(Stmt):
         self.else_stmt = else_stmt
 
     def __repr__(self):
-        return f"IfStmt({self.expr}, {self.stmt}, {self.else_stmt})"
+        return "IfStmt({}, {}, {})".format(self.expr,self.stmt,self.else_stmt)
 
 
 class WhileStmt(Stmt):
@@ -526,7 +526,7 @@ class WhileStmt(Stmt):
         self.stmt = stmt
 
     def __repr__(self):
-        return f"WhileStmt({self.expr}, {self.stmt})"
+        return "WhileStmt({}, {})".format(self.expr,self.stmt)
 
 
 class ForStmt(Stmt):
@@ -537,7 +537,7 @@ class ForStmt(Stmt):
         self.stmt = stmt
 
     def __repr__(self):
-        return f"ForStmt({self.init_expr}, {self.cond_expr}, {self.update_expr}, {self.stmt})"
+        return "ForStmt({}, {}, {}, {})".format(self.init_expr,self.cond_expr,self.update_expr,self.stmt)
 
 
 class BreakStmt(Stmt):
@@ -550,7 +550,7 @@ class ReturnStmt(Stmt):
         self.expr = expr
 
     def __repr__(self):
-        return f"ReturnStmt({self.expr})"
+        return "ReturnStmt({})".format(self.expr)
 
 
 class PrintStmt(Stmt):
@@ -558,7 +558,7 @@ class PrintStmt(Stmt):
         self.exprs = exprs
 
     def __repr__(self):
-        return f"PrintStmt({self.exprs})"
+        return "PrintStmt({})".format(self.exprs)
 
 
 class Expr:
@@ -570,7 +570,7 @@ class LValue(Expr):
         self.ident = ident
 
     def __repr__(self):
-        return f"LValue({self.ident})"
+        return "LValue({})".format(self.ident)
 
 
 class Call(Expr):
@@ -579,7 +579,7 @@ class Call(Expr):
         self.actuals = actuals
 
     def __repr__(self):
-        return f"Call({self.ident}, {self.actuals})"
+        return "Call({}, {})".format(self.ident,self.actuals)
 
 
 class BinaryExpr(Expr):
@@ -589,7 +589,7 @@ class BinaryExpr(Expr):
         self.right = right
 
     def __repr__(self):
-        return f"BinaryExpr({self.operator}, {self.left}, {self.right})"
+        return "BinaryExpr({}, {}, {})".format(self.operator,self.left,self.right)
 
 
 class UnaryExpr(Expr):
@@ -598,7 +598,7 @@ class UnaryExpr(Expr):
         self.operand = operand
 
     def __repr__(self):
-        return f"UnaryExpr({self.operator}, {self.operand})"
+        return "UnaryExpr({}, {})".format(self.operator,self.operand)
 
 
 class Constant(Expr):
@@ -606,7 +606,7 @@ class Constant(Expr):
         self.value = value
 
     def __repr__(self):
-        return f"Constant({self.value})"
+        return "Constant({})".format(self.value)
 
 
 class ReadInteger(Expr):
