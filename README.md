@@ -2,16 +2,19 @@
 # Project Phase III: Semantic Analizer and Code Generation
 # By Eulises Franco
 
-Python Parser for DECAF22
+Python Semantic Analizer and Code Generation for DECAF22
 
-Project Phase III consists in building a Parser for the "Decaf 22" programming language
+Project Phase III consists in building a Semantic Analizer for the "Decaf 22" programming language
 
 In order to run this program go inside workdir directory.
 Make sure exec.sh has executable permissions.
 
 If script has executable permissions:
-    use command ./exec.sh <file path>   to execute and display on terminal the proper lexical analysis of the input file provided
-
+    use command ./exec.sh <file path>   to execute.
+    If errors are encountered in the semantic analizer phase, such errors will be displayed on screen
+    If no errors encountered. A t1.s file will be generated and saved in workdir directory.
+    Then SPIM will be ran from the terminal executing the t1.s file to run the code generated.
+    
 To add executable permissions in linux use command:
     chmod +x filename
 
