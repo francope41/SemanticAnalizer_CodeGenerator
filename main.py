@@ -42,7 +42,7 @@ class SintaxAnalyzer:
 
         converter = ASTToMIPS()
         mips_instructions = converter.generate_mips(ast)
-        print(mips_instructions)
+        #print(mips_instructions)
 
         self.save_code_to_file(mips_instructions, "t1.s")
 
