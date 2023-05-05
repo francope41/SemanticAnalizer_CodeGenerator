@@ -1,136 +1,98 @@
 from utils import *
+class ASTToMIPS:
+    def __init__(self):
+        self.instructions = []
+        self.temp_counter = 2
+        self.string_counter = 1
+        self.labels = {}
+        self.symbol_table = {}
 
-class MIPSCodeGenerator:
-    def __init__(self, ast):
-        self.ast = ast
-        self.code = ""
-        self.string_constants = []
-        self.tmp_counter = 0
+    def get_new_temp(self):
+        temp = "$t{}".format(self.temp_counter)
+        self.temp_counter += 1
+        return temp
 
-    def generate_code(self):
-        main_found = False
-        self.code += "# standard Decaf preamble\n"
-        self.code += "  .text\n"
-        self.code += "  .align 2\n"
-        self.code += "  .globl main\n"
+    def get_new_string_label(self):
+        label = "_string{}".format(self.string_counter)
+        self.string_counter += 1
+        return label
 
-        for decl in self.ast.declarations:
-            if isinstance(decl, FunctionDecl):
-                if decl.ident == "main":
-                    main_found = True
-                self.process_function_decl(decl)
+    def traverse(self, node):
+        if isinstance(node, Program):
+            self.instructions.append("\t.text")
+            self.instructions.append("\t.align 2")
+            self.instructions.append("\t.globl main")
 
-        if not main_found:
-            print("*** Error.\n*** Linker: function 'main' not defined")
-            quit()
-        
-        return self.code
+            for child in node.declarations:
+                self.traverse(child)
+        elif isinstance(node, FunctionDecl):
+            self.instructions.append("{}:".format(node.ident))
+            self.instructions.append("\tsubu $sp, $sp, 8")
+            self.instructions.append("\tsw $fp, 8($sp)")
+            self.instructions.append("\tsw $ra, 4($sp)")
+            self.instructions.append("\taddiu $fp, $sp, 8")
 
-    def process_function_decl(self, function_decl):
-        self.code += "{}:\n".format(function_decl.ident)
-        self.code += "	# BeginFunc\n"
-        self.code += "      subu $sp, $sp, 8  # decrement sp to make space to save ra, fp\n"
-        self.code += "	  sw $fp, 8($sp)	# save fp\n"
-        self.code += "	  sw $ra, 4($sp)	# save ra\n"
-        self.code += "      addiu $fp, $sp, 8  # set up new fp\n"
-        self.code += "	  subu $sp, $sp, 24	# decrement sp to make space for locals/temps\n"
-        #self.code += "    sw $ra, 0($sp)  # save return address\n"
+            stack_space = len(node.stmt_block.variable_decls) * 4
+            self.instructions.append("\tsubu $sp, $sp, {}".format(stack_space))
 
-        for stmt in function_decl.stmt_block.stmts:
-            if isinstance(stmt, ExprStmt):
-                self.process_expr(stmt.expr)
-            elif isinstance(stmt, PrintStmt):
-                self.process_print_stmt(stmt)
-        #self.code += "  lw $ra, 0($sp)  # restore return address\n"
-        self.code += "      move $sp, $fp		# pop callee frame off stack\n"
-        self.code += "	  lw $ra, -4($fp)	# restore saved ra\n"
-        self.code += "	  lw $fp, 0($fp)	# restore saved fp\n"
-        self.code += "  jr $ra  # return to caller\n"
+            for child in node.stmt_block.variable_decls + node.stmt_block.stmts:
+                self.traverse(child)
 
-    def process_expr(self, expr):
-        if isinstance(expr, BinaryExpr):
-            self.process_binary_expr(expr)
-        elif isinstance(expr, Call):
-            self.process_call(expr)
-        elif isinstance(expr, Constant) and isinstance(expr.value, str):  # Handle string constants
-            self.process_string_constant(expr)
+            # EndFunc
+            self.instructions.append("\tmove $sp, $fp")
+            self.instructions.append("\tlw $ra, -4($fp)")
+            self.instructions.append("\tlw $fp, 0($fp)")
+            self.instructions.append("\tjr $ra")
+        elif isinstance(node, VariableDecl):
+            pass
+        elif isinstance(node, ExprStmt):
+            self.traverse(node.expr)
+        elif isinstance(node, BinaryExpr):
+            left_temp = self.traverse(node.left)
+            right_temp = self.traverse(node.right)
+            result_temp = self.get_new_temp()
 
-    def process_binary_expr(self, binary_expr):
-        # Assuming left and right operands are either Constant or LValue
-        left_operand = binary_expr.left
-        right_operand = binary_expr.right
+            if node.operator == 'EQUAL':
+                if left_temp.startswith('$'):  # If left_temp is a register
+                    self.instructions.append("\tsw {}, 0({})".format(right_temp,left_temp))
+                else:  # If left_temp is an offset
+                    self.instructions.append("\tsw {}, {}".format(right_temp,left_temp))
+            elif node.operator == 'PLUS':
+                left_value_temp = self.get_new_temp()
+                right_value_temp = self.get_new_temp()
+                self.instructions.append("\tlw {}, {}".format(left_value_temp,left_temp))
+                self.instructions.append("\tlw {}, {}".format(right_value_temp,right_temp))
+                self.instructions.append("\tadd {}, {}, {}".format(result_temp,left_value_temp,right_value_temp))
 
-        if isinstance(left_operand, Constant):
-            self.code += "  li $t0, {}\n".format(left_operand.value)
-        elif isinstance(left_operand, LValue):
-            self.code += "  lw $t0, {}\n".format(left_operand.ident)
+            return result_temp
+        elif isinstance(node, LValue):
+            if node.ident not in self.symbol_table:
+                index = len(self.symbol_table)
+                self.symbol_table[node.ident] = index
 
-        if isinstance(right_operand, Constant):
-            self.code += "  li $t1, {}\n".format(right_operand.value)
-        elif isinstance(right_operand, LValue):
-            self.code += "  lw $t1, {}\n".format(right_operand.ident)
+            offset = -(self.symbol_table[node.ident] + 1) * 4
+            return '{}($fp)'.format(offset)
+        elif isinstance(node, Constant):
+            if isinstance(node.value, int):
+                self.instructions.append("li {}, {}".format(self.temp_counter,node.value))
+            elif isinstance(node.value, str):
+                label = "_string{}".format(len(self.symbol_table))
+                self.instructions.append(".data")
+                self.instructions.append("{}: .asciiz {}".format(label,node.value))
+                self.instructions.append(".text")
+                self.instructions.append("la $t{}, {}".format(self.temp_counter,label))
 
-        if binary_expr.operator == "PLUS":
-            self.code += "  add $t2, $t0, $t1\n"
-        elif binary_expr.operator == "MINUS":
-            self.code += "  sub $t2, $t0, $t1\n"
-        elif binary_expr.operator == "MULTIPLY":
-            self.code += "  mul $t2, $t0, $t1\n"
-        elif binary_expr.operator == "DIVIDE":
-            self.code += "  div $t2, $t0, $t1\n"
-        # Add other binary operators as needed
+                self.symbol_table[node.value] = label
+            temp = "$t{}".format(self.temp_counter)
+            self.temp_counter += 1
+            return temp
+        elif isinstance(node, Call):
+            self.instructions.append("\tjal {}".format(node.ident))
+            for arg in node.actuals:
+                self.traverse(arg)
 
-        self.code += "  sw $t2, {}\n".format(binary_expr.left.ident)
-
-    def process_call(self, call):
-        # Assuming this handles print integer and print string calls only
-        if call.ident == "_PrintInt":
-            self.code += "  li $v0, 1  # system call for print integer\n"
-            self.code += "  syscall\n"
-        elif call.ident == "_PrintString":
-            self.code += "  li $v0, 4  # system call for print string\n"
-            self.code += "  syscall\n"
-
-    def process_print_stmt(self, print_stmt):
-        for expr in print_stmt.exprs:
-            if isinstance(expr, LValue):
-                self.code += " lw $a0, {}\n".format(expr.ident)
-                # self.process_call(Call("_PrintInt" if isinstance(expr, Constant) else "_PrintString", []))
-                # self.code += " la $a0, newline\n"
-                # self.process_call(Call("_PrintString", []))
-            elif isinstance(expr, Constant):
-                if isinstance(expr.value, int):
-                    self.code += " li $a0, {}\n".format(expr.value)
-                    # self.process_call(Call("_PrintInt", []))
-                elif isinstance(expr.value, str):
-                    index = self.string_constants.index(expr.value)
-                    self.code += " la $a0, str{}\n".format(index)
-                    # self.process_call(Call("_PrintString", []))
-                    # self.code += " la $a0, newline\n"
-                    # self.process_call(Call("_PrintString", []))
-
-            self.code += "  subu $sp, $sp, 4  # decrement sp to make space for param\n"
-            self.code += "  sw $t0, 4($sp)    # copy param value to stack\n"
-            self.code += "  jal _PrintInt\n" if isinstance(expr, Constant) and isinstance(expr.value, int) else "  jal _PrintString\n"
-            self.code += "  add $sp, $sp, 4  # pop params off stack\n"
-
-    def process_string_constant(self, expr):
-        string_value = expr.value
-        if string_value not in self.string_constants:
-            label = "_string{}".format(len(self.string_constants) + 1)
-            self.string_constants[string_value] = label
-            self.code += "  .data\n"
-            self.code += "  {}: .asciiz \"{}\"\n".format(label,string_value)
-            self.code += "  .text\n"
-        else:
-            label = self.string_constants[string_value]
-
-        tmp_name = self.new_tmp()
-        self.code += "  la $t2, {}\n".format(label)
-        self.code += "  sw $t2, {}($fp)\n".format(tmp_name)
-
-
-    def new_tmp(self):
-        tmp_name = "_tmp{}".format(self.tmp_counter)
-        self.tmp_counter += 1
-        return tmp_name
+    def generate_mips(self,ast):
+        mips_generator = ASTToMIPS()
+        mips_generator.traverse(ast)
+        mips_code = "\n".join(mips_generator.instructions)
+        return mips_code

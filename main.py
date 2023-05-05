@@ -8,12 +8,8 @@ import sys
 import numpy as np
 from utils import *
 from semantic import SemanticAnalyzer
-from codeGen import MIPSCodeGenerator
-
-from testcodegen import ASTToMIPS
-
+from CodeGen import ASTToMIPS
 #### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -####
-
 
 class SintaxAnalyzer:
     def __init__(self, program):
