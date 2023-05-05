@@ -17,6 +17,12 @@ If script has executable permissions:
     
 To add executable permissions in linux use command:
     chmod +x filename
+    when in workdir directory:
+        do chmod +x exec.sh
+        then 
+        do chmod +x ../pp3-post/spim/spim
+         
+
 
 !!!! Important !!!!
 Make sure main.py and utils.py are on the same directory outside workdir.
