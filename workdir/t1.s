@@ -1,31 +1,38 @@
 	.text
 	.align 2
 	.globl main
-main:
-	subu $sp, $sp, 8
-	sw $fp, 8($sp)
-	sw $ra, 4($sp)
-	addiu $fp, $sp, 8
-	subu $sp, $sp, 8
-.data
-_string1: .asciiz "hello"
-.text
-la $t2, _string1
-	sw $t2, -4($fp)
-	jal test
-li 4, 4
-li 5, 5
-	sw None, -12($fp)
-	move $sp, $fp
-	lw $ra, -4($fp)
-	lw $fp, 0($fp)
-	jr $ra
-test:
+foo:
 	subu $sp, $sp, 8
 	sw $fp, 8($sp)
 	sw $ra, 4($sp)
 	addiu $fp, $sp, 8
 	subu $sp, $sp, 0
+	move $sp, $fp
+	lw $ra, -4($fp)
+	lw $fp, 0($fp)
+	jr $ra
+main:
+	subu $sp, $sp, 8
+	sw $fp, 8($sp)
+	sw $ra, 4($sp)
+	addiu $fp, $sp, 8
+	subu $sp, $sp, 4
+li 2, 10
+	sw $t2, -4($fp)
+li 4, 2
+	sw $t5, -8($fp)
+	jal foo
+li 7, True
+	jal foo
+li 8, 2
+	lw $t10, -8($fp)
+	lw $t11, $t8
+	add $t9, $t10, $t11
+	jal foo
+	jal foo
+li 13, 3
+li 14, True
+li 15, False
 	move $sp, $fp
 	lw $ra, -4($fp)
 	lw $fp, 0($fp)

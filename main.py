@@ -8,7 +8,7 @@ import sys
 import numpy as np
 from utils import *
 from semantic import SemanticAnalyzer
-from CodeGen import ASTToMIPS
+from codeGen import ASTToMIPS
 #### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -####
 
 class SintaxAnalyzer:
@@ -33,8 +33,8 @@ class SintaxAnalyzer:
             pass
             #print("No errors Found")
 
-        mips_generator = MIPSCodeGenerator(ast)
-        code = mips_generator.generate_code()
+        # mips_generator = ASTToMIPS(ast)
+        # code = mips_generator.generate_code()
 
         converter = ASTToMIPS()
         mips_instructions = converter.generate_mips(ast)
